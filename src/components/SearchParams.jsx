@@ -1,26 +1,33 @@
-import { useContext, useState } from "react";
-import { useQuery } from "react-query";
+import React, { useState } from "react";
 import Results from "./Results";
-import fetchSearch from "../apiCalls/fetchSearch";
-import fetchBreedList from "../apiCalls/fetchBreedList";
-import AdoptedPetContext from "../contexts/AdoptedPetContext";
+import { useQuery } from "@tanstack/react-query";
+import { useSelector, useDispatch } from "react-redux";
+import { all } from "../store/searchParamsSlice";
+import fetchBreedList from "../queries/fetchBreedList";
+// import fetchSearch from "../queries/fetchSearch";
+import { useSearchQuery } from "../apiServices/petApiService";
+import { useGetBreedsQuery } from "../apiServices/petApiService";
 const ANIMALS = ["bird", "cat", "dog", "rabbit", "reptile"];
 
 const SearchParams = () => {
-  const [requestParams, setRequestParams] = useState({
-    location: "",
-    animal: "",
-    breed: "",
-  });
+  const dispatch = useDispatch();
+  const adoptedPet = useSelector((state) => state.adoptedPet.value);
+
+  const requestParams = useSelector((state) => state.searchParams.value);
 
   const [animal, setAnimal] = useState("");
-  // If you want to call APIs at hthe start of the render then use useQuery with no parameters i.e. const results1 = useQuery(["breeds"], fetchBreedList);
-  const results1 = useQuery(["breeds", animal], fetchBreedList); // It runs whenever animal changes (checks breed cache, if data available it fetches) depending on the stall & cache time
-  const breeds = results1?.data?.breeds ?? [];
-  const [adoptedPet] = useContext(AdoptedPetContext); // Here we are using only adoptedPet
-  // Use react-query instead of useEffect
-  const results = useQuery(["search", requestParams], fetchSearch); // Here search is the key in the cache used by react-dom
-  const pets = results?.data?.pets ?? [];
+
+  // Using React Query
+  // const tempBreeds = useQuery(["breeds", animal], fetchBreedList);
+  // const breeds = tempBreeds?.data?.breeds ?? [];
+  // const results = useQuery(["search", requestParams], fetchSearch);
+  // const pets = results?.data?.pets ?? [];
+  // Using RTK Query
+  let { data: breeds } = useGetBreedsQuery(animal);
+  breeds = breeds ?? [];
+  let { data: pets } = useSearchQuery(requestParams);
+  pets = pets ?? [];
+
   return (
     <div className="search-params">
       <form
@@ -28,42 +35,66 @@ const SearchParams = () => {
           e.preventDefault();
           const formData = new FormData(e.target);
           const obj = {
-            animal: formData.get("animal") ?? "", // Data agaya nahinto empty string kardo
-            breed: formData.get("breed") ?? "",
+            animal: formData.get("animal") ?? "",
             location: formData.get("location") ?? "",
+            breed: formData.get("breed") ?? "",
           };
-          setRequestParams(obj);
+
+          dispatch(all(obj));
         }}
       >
         {adoptedPet ? (
           <div className="pet image-container">
-            <img src={adoptedPet.images[0]} alt={adoptedPet.name} />
+            <img src={adoptedPet.images[0]} alt={name} />
           </div>
         ) : null}
-        <label htmlFor="location">Location</label>
-        <input id="location" name="location" placeholder="Location" />
-        <label htmlFor="animal">Animal</label>
-        <select
-          id="animal"
-          name="animal"
-          value={animal}
-          onChange={(e) => {
-            setAnimal(e.target.value);
-          }}
-        >
-          <option />
-          {ANIMALS.map((animal) => {
-            return <option key={animal}>{animal}</option>;
-          })}
-        </select>
-        <label htmlFor="breed">Breed</label>
-        <select id="breed" disabled={breeds.length === 0} name="breed">
-          <option />
-          {breeds.map((breed) => {
-            return <option key={breed}>{breed}</option>;
-          })}
-        </select>
-        <button>Submit</button>
+
+        <label htmlFor="location">
+          Location
+          <input
+            id="location"
+            name="location"
+            placeholder="Location"
+            className="min-h-[auto] w-full rounded border-0 px-2 py-[0.00rem] leading-[1.2]"
+          />
+        </label>
+
+        <label htmlFor="animal">
+          Animal
+          <select
+            name="animal"
+            className="min-h-[auto] w-full rounded border-0 px-2 py-[0.00rem] leading-[1.2]"
+            id="animal"
+            value={animal}
+            onChange={(e) => setAnimal(e.target.value)}
+          >
+            <option />
+            {ANIMALS.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label htmlFor="breed">
+          Breed
+          <select
+            id="breed"
+            name="breed"
+            disabled={breeds.length === 0}
+            className="min-h-[auto] w-full rounded border-0 px-2 py-[0.00rem] leading-[1.2]"
+          >
+            <option />
+            {breeds.map((item) => (
+              <option key={item} value={item}>
+                {item}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <button type="submit">Submit</button>
       </form>
       <Results pets={pets} />
     </div>
@@ -71,8 +102,3 @@ const SearchParams = () => {
 };
 
 export default SearchParams;
-
-/*
-  Func-1 : By selecting an animal, we can get the breeds of that animal
-  Func-2 : By giving input to the form we can get the list of all pets available to adopt
-*/
